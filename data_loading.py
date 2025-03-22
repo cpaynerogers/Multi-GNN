@@ -1,19 +1,22 @@
-import pandas as pd
-import numpy as np
-import torch
-import logging
 import itertools
-from data_util import GraphData, HeteroData, z_norm, create_hetero_obj
+import logging
+
+import numpy as np
+import pandas as pd
+import torch
+
+from data_util import GraphData, z_norm, create_hetero_obj
+
 
 def get_data(args, data_config):
-    '''Loads the AML transaction data.
+    """Loads the AML transaction data.
     
     1. The data is loaded from the csv and the necessary features are chosen.
     2. The data is split into training, validation and test data.
     3. PyG Data objects are created with the respective data splits.
-    '''
+    """
 
-    transaction_file = f"{data_config['paths']['aml_data']}/{args.data}/formatted_transactions.csv" #replace this with your path to the respective AML data objects
+    transaction_file = f"{data_config['paths']['aml_data']}/{args.data}/formatted_transactions.csv"  # replace this with your path to the respective AML data objects
     df_edges = pd.read_csv(transaction_file)
 
     logging.info(f'Available Edge Features: {df_edges.columns.tolist()}')
@@ -43,8 +46,8 @@ def get_data(args, data_config):
     n_samples = y.shape[0]
     logging.info(f'number of days and transactions in the data: {n_days} days, {n_samples} transactions')
 
-    #data splitting
-    daily_irs, weighted_daily_irs, daily_inds, daily_trans = [], [], [], [] #irs = illicit ratios, inds = indices, trans = transactions
+    # data splitting
+    daily_irs, weighted_daily_irs, daily_inds, daily_trans = [], [], [], []  # irs = illicit ratios, inds = indices, trans = transactions
     for day in range(n_days):
         l = day * 24 * 3600
         r = (day + 1) * 24 * 3600
@@ -71,15 +74,15 @@ def get_data(args, data_config):
             continue
 
     i,j = min(split_scores, key=split_scores.get)
-    #split contains a list for each split (train, validation and test) and each list contains the days that are part of the respective split
+    # split contains a list for each split (train, validation and test) and each list contains the days that are part of the respective split
     split = [list(range(i)), list(range(i, j)), list(range(j, len(daily_totals)))]
     logging.info(f'Calculate split: {split}')
 
-    #Now, we seperate the transactions based on their indices in the timestamp array
+    # Now, we separate the transactions based on their indices in the timestamp array
     split_inds = {k: [] for k in range(3)}
     for i in range(3):
         for day in split[i]:
-            split_inds[i].append(daily_inds[day]) #split_inds contains a list for each split (tr,val,te) which contains the indices of each day seperately
+            split_inds[i].append(daily_inds[day])  # split_inds contains a list for each split (tr,val,te) which contains the indices of each day separately
 
     tr_inds = torch.cat(split_inds[0])
     val_inds = torch.cat(split_inds[1])
@@ -92,7 +95,7 @@ def get_data(args, data_config):
     logging.info(f"Total test samples: {te_inds.shape[0] / y.shape[0] * 100 :.2f}% || IR: "
         f"{y[te_inds].float().mean() * 100:.2f}% || Test days: {split[2][:5]}")
     
-    #Creating the final data objects
+    # Creating the final data objects
     tr_x, val_x, te_x = x, x, x
     e_tr = tr_inds.numpy()
     e_val = np.concatenate([tr_inds, val_inds])
@@ -105,7 +108,7 @@ def get_data(args, data_config):
     val_data = GraphData(x=val_x, y=val_y, edge_index=val_edge_index, edge_attr=val_edge_attr, timestamps=val_edge_times)
     te_data = GraphData (x=te_x,  y=te_y,  edge_index=te_edge_index,  edge_attr=te_edge_attr,  timestamps=te_edge_times )
 
-    #Adding ports and time-deltas if applicable
+    # Adding ports and time-deltas if applicable
     if args.ports:
         logging.info(f"Start: adding ports")
         tr_data.add_ports()
@@ -119,15 +122,17 @@ def get_data(args, data_config):
         te_data.add_time_deltas()
         logging.info(f"Done: adding time-deltas")
     
-    #Normalize data
+    # Normalize data
     tr_data.x = val_data.x = te_data.x = z_norm(tr_data.x)
     if not args.model == 'rgcn':
         tr_data.edge_attr, val_data.edge_attr, te_data.edge_attr = z_norm(tr_data.edge_attr), z_norm(val_data.edge_attr), z_norm(te_data.edge_attr)
     else:
         tr_data.edge_attr[:, :-1], val_data.edge_attr[:, :-1], te_data.edge_attr[:, :-1] = z_norm(tr_data.edge_attr[:, :-1]), z_norm(val_data.edge_attr[:, :-1]), z_norm(te_data.edge_attr[:, :-1])
 
-    #Create heterogenous if reverese MP is enabled
-    #TODO: if I observe wierd behaviour, maybe add .detach.clone() to all torch tensors, but I don't think they're attached to any computation graph just yet
+    # Create heterogenous if reverse MP is enabled
+    # TODO: if I observe weird behavior, maybe add .detach.clone() to
+    # all torch tensors, but I don't think they're attached to any
+    # computation graph just yet
     if args.reverse_mp:
         tr_data = create_hetero_obj(tr_data.x,  tr_data.y,  tr_data.edge_index,  tr_data.edge_attr, tr_data.timestamps, args)
         val_data = create_hetero_obj(val_data.x,  val_data.y,  val_data.edge_index,  val_data.edge_attr, val_data.timestamps, args)
@@ -138,4 +143,3 @@ def get_data(args, data_config):
     logging.info(f'test data object: {te_data}')
 
     return tr_data, val_data, te_data, tr_inds, val_inds, te_inds
-    

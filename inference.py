@@ -1,21 +1,23 @@
-import torch
-import pandas as pd
-from train_util import AddEgoIds, extract_param, add_arange_ids, get_loaders, evaluate_homo, evaluate_hetero
-from training import get_model
-from torch_geometric.nn import to_hetero, summary
-import wandb
 import logging
 import os
 import sys
 import time
 
+import torch
+import wandb
+from torch_geometric.nn import to_hetero
+
+from train_util import AddEgoIds, extract_param, add_arange_ids, get_loaders, evaluate_homo, evaluate_hetero
+from training import get_model
+
 script_start = time.time()
 
+
 def infer_gnn(tr_data, val_data, te_data, tr_inds, val_inds, te_inds, args, data_config):
-    #set device
+    # set device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    #define a model config dictionary and wandb logging at the same time
+    # define a model config dictionary and wandb logging at the same time
     wandb.init(
         mode="disabled" if args.testing else "online",
         project="your_proj_name",
@@ -40,18 +42,18 @@ def infer_gnn(tr_data, val_data, te_data, tr_inds, val_inds, te_inds, args, data
 
     config = wandb.config
 
-    #set the transform if ego ids should be used
+    # set the transform if ego ids should be used
     if args.ego:
         transform = AddEgoIds()
     else:
         transform = None
 
-    #add the unique ids to later find the seed edges
+    # add the unique ids to later find the seed edges
     add_arange_ids([tr_data, val_data, te_data])
 
     tr_loader, val_loader, te_loader = get_loaders(tr_data, val_data, te_data, tr_inds, val_inds, te_inds, transform, args)
 
-    #get the model
+    # get the model
     sample_batch = next(iter(tr_loader))
     model = get_model(sample_batch, config, args)
 

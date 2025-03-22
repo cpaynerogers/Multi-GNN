@@ -1,7 +1,7 @@
 import numpy as np
 import datatable as dt
 from datetime import datetime
-from datatable import f,join,sort
+from datatable import sort
 import sys
 import os
 
@@ -21,6 +21,7 @@ paymentFormat = dict()
 bankAcc = dict()
 account = dict()
 
+
 def get_dict_val(name, collection):
     if name in collection:
         val = collection[name]
@@ -28,6 +29,7 @@ def get_dict_val(name, collection):
         val = len(collection)
         collection[name] = val
     return val
+
 
 header = "EdgeID,from_id,to_id,Timestamp,\
 Amount Sent,Sent Currency,Amount Received,Received Currency,\

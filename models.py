@@ -1,13 +1,25 @@
-import torch.nn as nn
-from torch_geometric.nn import GINEConv, BatchNorm, Linear, GATConv, PNAConv, RGCNConv
-import torch.nn.functional as F
-import torch
 import logging
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GINEConv, BatchNorm, Linear, GATConv, PNAConv, RGCNConv
+
+
 class GINe(torch.nn.Module):
-    def __init__(self, num_features, num_gnn_layers, n_classes=2, 
-                n_hidden=100, edge_updates=False, residual=True, 
-                edge_dim=None, dropout=0.0, final_dropout=0.5):
+
+    def __init__(
+        self,
+        num_features,
+        num_gnn_layers,
+        n_classes=2, 
+        n_hidden=100,
+        edge_updates=False,
+        residual=True, 
+        edge_dim=None,
+        dropout=0.0,
+        final_dropout=0.5,
+    ):
         super().__init__()
         self.n_hidden = n_hidden
         self.num_gnn_layers = num_gnn_layers
@@ -34,8 +46,15 @@ class GINe(torch.nn.Module):
             self.convs.append(conv)
             self.batch_norms.append(BatchNorm(n_hidden))
 
-        self.mlp = nn.Sequential(Linear(n_hidden*3, 50), nn.ReLU(), nn.Dropout(self.final_dropout),Linear(50, 25), nn.ReLU(), nn.Dropout(self.final_dropout),
-                              Linear(25, n_classes))
+        self.mlp = nn.Sequential(
+            Linear(n_hidden*3, 50),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(50, 25),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(25, n_classes),
+        )
 
     def forward(self, x, edge_index, edge_attr):
         src, dst = edge_index
@@ -53,10 +72,24 @@ class GINe(torch.nn.Module):
         out = x
         
         return self.mlp(out)
-    
+
+
 class GATe(torch.nn.Module):
-    def __init__(self, num_features, num_gnn_layers, n_classes=2, n_hidden=100, n_heads=4, edge_updates=False, edge_dim=None, dropout=0.0, final_dropout=0.5):
+
+    def __init__(
+        self,
+        num_features,
+        num_gnn_layers,
+        n_classes=2,
+        n_hidden=100,
+        n_heads=4,
+        edge_updates=False,
+        edge_dim=None,
+        dropout=0.0,
+        final_dropout=0.5,
+    ):
         super().__init__()
+
         # GAT specific code
         tmp_out = n_hidden // n_heads
         n_hidden = tmp_out * n_heads
@@ -77,11 +110,26 @@ class GATe(torch.nn.Module):
         
         for _ in range(self.num_gnn_layers):
             conv = GATConv(self.n_hidden, tmp_out, self.n_heads, concat = True, dropout = self.dropout, add_self_loops = True, edge_dim=self.n_hidden)
-            if self.edge_updates: self.emlps.append(nn.Sequential(nn.Linear(3 * self.n_hidden, self.n_hidden),nn.ReLU(),nn.Linear(self.n_hidden, self.n_hidden),))
+            if self.edge_updates:
+                self.emlps.append(
+                    nn.Sequential(
+                        nn.Linear(3 * self.n_hidden, self.n_hidden),
+                        nn.ReLU(),
+                        nn.Linear(self.n_hidden, self.n_hidden),
+                    )
+                )
             self.convs.append(conv)
             self.batch_norms.append(BatchNorm(n_hidden))
                 
-        self.mlp = nn.Sequential(Linear(n_hidden*3, 50), nn.ReLU(), nn.Dropout(self.final_dropout),Linear(50, 25), nn.ReLU(), nn.Dropout(self.final_dropout),Linear(25, n_classes))
+        self.mlp = nn.Sequential(
+            Linear(n_hidden*3, 50),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(50, 25),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(25, n_classes),
+        )
             
     def forward(self, x, edge_index, edge_attr):
         src, dst = edge_index
@@ -102,11 +150,22 @@ class GATe(torch.nn.Module):
         out = x
 
         return self.mlp(out)
-    
+
+
 class PNA(torch.nn.Module):
-    def __init__(self, num_features, num_gnn_layers, n_classes=2, 
-                n_hidden=100, edge_updates=True,
-                edge_dim=None, dropout=0.0, final_dropout=0.5, deg=None):
+
+    def __init__(
+        self,
+        num_features,
+        num_gnn_layers,
+        n_classes=2, 
+        n_hidden=100,
+        edge_updates=True,
+        edge_dim=None,
+        dropout=0.0,
+        final_dropout=0.5,
+        deg=None,
+    ):
         super().__init__()
         n_hidden = int((n_hidden // 5) * 5)
         self.n_hidden = n_hidden
@@ -136,8 +195,14 @@ class PNA(torch.nn.Module):
             self.convs.append(conv)
             self.batch_norms.append(BatchNorm(n_hidden))
 
-        self.mlp = nn.Sequential(Linear(n_hidden*3, 50), nn.ReLU(), nn.Dropout(self.final_dropout),Linear(50, 25), nn.ReLU(), nn.Dropout(self.final_dropout),
-                              Linear(25, n_classes))
+        self.mlp = nn.Sequential(
+            Linear(n_hidden*3, 50),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),Linear(50, 25),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(25, n_classes),
+        )
 
     def forward(self, x, edge_index, edge_attr):
         src, dst = edge_index
@@ -157,12 +222,23 @@ class PNA(torch.nn.Module):
         logging.debug(f"x.shape = {x.shape}")
         out = x
         return self.mlp(out)
-    
+
+
 class RGCN(nn.Module):
-    def __init__(self, num_features, edge_dim, num_relations, num_gnn_layers, n_classes=2, 
-                n_hidden=100, edge_update=False,
-                residual=True,
-                dropout=0.0, final_dropout=0.5, n_bases=-1):
+    def __init__(
+        self,
+        num_features,
+        edge_dim,
+        num_relations,
+        num_gnn_layers,
+        n_classes=2, 
+        n_hidden=100,
+        edge_update=False,
+        residual=True,
+        dropout=0.0,
+        final_dropout=0.5,
+        n_bases=-1,
+    ):
         super(RGCN, self).__init__()
 
         self.num_features = num_features
@@ -203,8 +279,15 @@ class RGCN(nn.Module):
                     nn.Linear(self.n_hidden, self.n_hidden),
                 ))
 
-        self.mlp = nn.Sequential(Linear(n_hidden*3, 50), nn.ReLU(), nn.Dropout(self.final_dropout), Linear(50, 25), nn.ReLU(), nn.Dropout(self.final_dropout),
-                              Linear(25, n_classes))
+        self.mlp = nn.Sequential(
+            Linear(n_hidden*3, 50),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(50, 25),
+            nn.ReLU(),
+            nn.Dropout(self.final_dropout),
+            Linear(25, n_classes),
+        )
 
     def reset_parameters(self):
         for m in self.modules():
@@ -217,7 +300,7 @@ class RGCN(nn.Module):
 
     def forward(self, x, edge_index, edge_attr):
         edge_type = edge_attr[:, -1].long()
-        #edge_attr = edge_attr[:, :-1]
+        # edge_attr = edge_attr[:, :-1]
         src, dst = edge_index
 
         x = self.node_emb(x)
